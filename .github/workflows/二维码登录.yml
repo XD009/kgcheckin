@@ -22,8 +22,9 @@ on:
         options:
           - 否
           - 是
+# 需要 contents: write 才能创建 Release 上传二维码直链
 permissions:
-  contents: read
+  contents: write
 jobs:
   run:
     runs-on: ubuntu-latest
@@ -76,26 +77,42 @@ jobs:
           APPEND_USER: ${{ github.event.inputs.append_user }}
 
       # ════════════════════════════════════════════
-      #   步骤二：立即上传 HTML（gen 完成后立即可下载）
+      #   步骤二（核心）：发布二维码为 GitHub Release 直链
+      #   浏览器点击链接即显示图片/网页，无需下载解压
       #   ════════════════════════════════════════════
-      - name: 上传二维码 HTML 页面（👈 下载这个！浏览器打开即可扫码）
+      - name: 发布二维码图片直链（👈 点击即可查看，无需下载解压）
+        id: publish
         if: ${{ always() && steps.gen.outcome == 'success' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="qr-${{ github.run_id }}"
+          gh release create "$TAG" qr/*.png qr/login.html \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "酷狗扫码登录二维码" \
+            --notes "用「酷狗音乐 APP」扫描下方二维码完成登录（约 2 分钟内有效）"
+
+          echo ""
+          echo "══════════════════════════════════════════════════════════"
+          echo "  📱 点击下方链接，浏览器直接显示二维码图片（无需解压）："
+          echo "══════════════════════════════════════════════════════════"
+          for f in qr/*.png; do
+            echo "  🔗 https://github.com/${{ github.repository }}/releases/download/$TAG/$(basename "$f")"
+          done
+          echo ""
+          echo "  🌐 或打开完整网页（含所有账号大图）："
+          echo "  🔗 https://htmlpreview.github.io/?https://github.com/${{ github.repository }}/releases/download/$TAG/login.html"
+          echo "══════════════════════════════════════════════════════════"
+
+      # ═══ 备用：HTML 仍上传为 artifact（万一 Release 失败兜底）═══
+      - name: 上传二维码 HTML 页面（兜底备份）
+        if: ${{ always() && steps.gen.outcome == 'success' && steps.publish.outcome != 'success' }}
         uses: actions/upload-artifact@v4
         with:
           name: 二维码HTML
           path: |
             qr/login.html
             qr/qr-*.html
-          retention-days: 1
-          if-no-files-found: warn
-
-      # ═══ 备用：PNG 图片 ═══
-      - name: 上传二维码 PNG 图片
-        if: ${{ always() && steps.gen.outcome == 'success' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: 二维码PNG
-          path: qr/*.png
           retention-days: 1
           if-no-files-found: warn
 
@@ -111,7 +128,6 @@ jobs:
 
       # ════════════════════════════════════════════
       #   步骤三：轮询等待用户扫码确认
-      #   用 always() 确保无论前面怎样都会尝试执行（内部自行判断）
       #   ════════════════════════════════════════════
       - name: 等待扫码登录
         if: ${{ always() }}
@@ -123,12 +139,16 @@ jobs:
           PAT: ${{ secrets.PAT }}
           GITHUB_REPOSITORY: ${{ github.repository }}
 
-      # ═══ 兜底 ═══
-      - name: 上传全部文件（兜底）
+      # ═══ 清理：仅保留最近 5 个二维码 Release ═══
+      - name: 清理旧的二维码 Release
         if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: 二维码全部文件_兜底
-          path: qr/
-          retention-days: 1
-          if-no-files-found: ignore
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 \
+            | awk '$1 ~ /^qr-/ {print $1}' | head -n -5 \
+            | while read t; do
+                gh release delete "$t" --repo "$GITHUB_REPOSITORY" -y
+                echo "已删除旧 Release: $t"
+              done

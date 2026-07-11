@@ -79,7 +79,7 @@ async function buildQr(url, index, total) {
   printMagenta(`\n═══ 第 ${index}/${total} 个二维码已生成 ═══`)
   console.log('')
   console.log('  📱 扫码方式（按推荐顺序）：')
-  console.log('     ① 在页面底部的 Artifacts 区域下载「二维码HTML」→ 浏览器打开 → 直接扫大图')
+  console.log('     ① 查看后续「发布二维码图片直链」步骤的链接 → 浏览器打开即显示图片 → 直接扫')
   console.log('     ② 点击本页面上方「Summary」标签查看图片')
   console.log('     ③ 复制下方链接到酷狗 App 内打开：')
   console.log('')
@@ -211,8 +211,8 @@ async function genMode() {
     }
 
     fs.writeFileSync(KEYS_FILE, JSON.stringify({ number, keys }))
-    printMagenta(`\n✅ 已生成 ${number} 个二维码。`)
-    printMagenta(`📲 请在页面底部的「Artifacts」区域下载「二维码HTML」，浏览器打开即可看到大图扫码！`)
+  printMagenta(`\n✅ 已生成 ${number} 个二维码。`)
+  printMagenta(`🔗 请查看下一步「发布二维码图片直链」输出的可点击链接，浏览器打开即可直接扫码（无需下载解压）！`)
   } catch (e) {
     const msg = e && e.message ? e.message : String(e)
     console.error(`::error::二维码生成失败：${msg}`)
